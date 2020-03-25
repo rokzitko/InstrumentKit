@@ -14,10 +14,12 @@ import instruments.units as u
 
 from instruments.abstract_instruments import FunctionGenerator
 from instruments.generic_scpi import SCPIInstrument
-from instruments.util_fns import enum_property, unitful_property, bool_property, int_property
+from instruments.util_fns import enum_property, unitful_property, bool_property, int_property, string_property
 
 # CLASSES #####################################################################
 
+def ceiling_division(n, d):
+    return -(n // -d)
 
 class Wavetek39A(SCPIInstrument, FunctionGenerator):
 
@@ -122,11 +124,14 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         """
         #: continuous operation
         cont = "CONT"
+        continuous = "CONT"
         #: gated
         gate = "GATE"
+        gated = "GATE"
         #: triggered burst mode (each active edge of the trigger signal produces one
         #: burst of the waveform)
         trig = "TRIG"
+        triggered = "TRIG"
         #: sweep
         sweep = "SWEEP"
         #: tone mode
@@ -210,6 +215,30 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         """
     )
 
+    clock_frequency = unitful_property(
+        command="CLKFREQ",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the arbitrary sample clock frequency.
+
+        :units: As specified, or assumed to be :math:`\\text{Hz}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    clock_period = unitful_property(
+        command="CLKPER",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the arbitrary sample clock period.
+
+        :units: As specified, or assumed to be :math:`\\text{s}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
     zload = enum_property(
         command="ZLOAD",
         enum=ZLoad,
@@ -218,17 +247,6 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         Sets the output load.
 
         :type: `~Wavetek39A.ZLoad`
-        """
-    )
-
-    function = enum_property(
-        command="WAVE",
-        enum=Function,
-        writeonly=True,
-        doc="""
-        Sets the output function of the function generator.
-
-        :type: `~Wavetek39A.Function`
         """
     )
 
@@ -243,6 +261,178 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         :type: `float` or `~quantities.quantity.Quantity`
         """
     )
+
+    function = enum_property(
+        command="WAVE",
+        enum=Function,
+        writeonly=True,
+        doc="""
+        Sets the output function of the function generator.
+
+        :type: `~Wavetek39A.Function`
+        """
+    )
+
+    pulse_period = unitful_property(
+        command="PULSPER",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the pulse period.
+
+        :units: As specified, or assumed to be :math:`\\text{s}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    pulse_width = unitful_property(
+        command="PULSWID",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the pulse width.
+
+        :units: As specified, or assumed to be :math:`\\text{s}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    pulse_delay = unitful_property(
+        command="PULSDLY",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the pulse delay.
+
+        :units: As specified, or assumed to be :math:`\\text{s}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    pulse_train_length = int_property(
+        command="PULSTRNLEN",
+        writeonly=True,
+        doc="""
+        Sets the number of pulses in the pulse-train.
+
+        :units: Number.
+        :type: `int`
+        """
+    )
+
+    pulse_train_period = unitful_property(
+        command="PULSTRNPER",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the pulse-train period.
+
+        :units: As specified, or assumed to be :math:`\\text{s}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    pulse_train_base_line = unitful_property(
+        command="PULSTRNBASE",
+        units=u.V,
+        writeonly=True,
+        doc="""
+        Sets the pulse-train base line voltage.
+
+        :units: As specified, or assumed to be :math:`\\text{V}` otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    # pulse_train_level = unitful_property(  ## has two parameters!
+   
+    arbitrary = string_property(
+        command="ARB",
+        writeonly=True,
+        bookmark_symbol = '',
+        doc="""
+        Select an arbitray waveform for output.
+        
+        :type: `str`
+        """
+    )
+    
+    arbitrary_list_ch = string_property(
+        command="ARBLISTCH",
+        readonly=True,
+        bookmark_symbol = '',
+        doc="""
+        List of all arbitrary waveforms in the channel's memory.
+        
+        :type: `str`
+        """
+    )
+
+    arbitrary_list = string_property(
+        command="ARBLIST",
+        readonly=True,
+        bookmark_symbol = '',
+        doc="""
+        List of all arbitrary waveforms in the backup memory.
+        
+        :type: `str`
+        """
+    )
+
+    def arbitrary_delete(self, cpd):
+        """
+        Delete an arbitrary wavefrom from backup memory.
+        
+        :type: `str`
+        """
+        self.sendcmd("ARBDELETE {}".format(cpd))
+    
+    def arbitrary_clear(self, cpd):
+        """
+        Delete an arbitrary wavefrom from channel memory.
+        
+        :type: `str`
+        """
+        self.sendcmd("ARBCLR {}".format(cpd))
+    
+    def arbitrary_create(self, cpd, nrf):
+        """
+        Create a new black arbitrary waveform.
+        
+        :type cpd: `str`
+        :type nrf: `int`
+        """
+        self.sendcmd("ARBCREATE {},{}".format(cpd,nrf))
+        
+    def arbitrary_get_data_csv(self, cpd):
+        self.query("ARBDATACSV? {}".format(cpd))
+        
+    def arbitrary_define(self, cpd, csv):
+        """
+        Define a new or existing arbitrary waveform from a list.
+        
+        :type cpd: `str`
+        :type csv: `iterable`
+        """
+        csvint = [int(x) for x in csv]
+        def check_val(x): 
+            if not(-2048 <= x and x <= +2047):
+                raise RuntimeError("out of range {}".format(x))
+        [check_val(x) for x in csvint]
+        cmd = "ARBDEFCSV {},{},{}".format(cpd, str(len(csv)), ",".join([str(i) for i in csv]))
+        print(cmd)
+        self.sendcmd(cmd)
+        
+    def arbitray_edit_limits(self, nrf1, nrf2):
+        self.sendcmt("ARBEDLMTS {},{}".format(nrf1,nrf2))
+        
+    def arbitrary_define2(self, cpd, csv):
+        self.arbitrary_delete(cpd)
+        self.arbitrary_create(cpd, len(csv))
+        chunk_len = 10
+        nr_chunk = ceiling_division(len(csv), chunk_len)
+        for i in range(nr_chunk):
+            self.aribitrary_edit_limits(1 + i*chunk_len, 10 + i*chunk_len)
 
     phase = unitful_property(
         command="PHASE",
