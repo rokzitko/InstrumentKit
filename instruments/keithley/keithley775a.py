@@ -11,19 +11,21 @@ Rok Zitko, March 2020
 
 # IMPORTS #####################################################################
 
-import time
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 import instruments.units as u
 
 from instruments.abstract_instruments import Instrument
 from instruments.util_fns import ProxyList
 from instruments.abstract_instruments.comm import VisaCommunicator
-from pyvisa import constants
+#from pyvisa import constants
 
 # CLASSES #####################################################################
 
 def isfloat(value):
+    """
+    Returns True if convertible to float.
+    """
     try:
         float(value)
         return True
@@ -31,8 +33,11 @@ def isfloat(value):
         return False
 
 def isconvertible(value, unit):
+    """
+    Returns True if convertype to type 'unit'.
+    """
     try:
-        x = value.rescale(unit)
+        value.rescale(unit)
         return True
     except ValueError:
         return False
@@ -42,7 +47,7 @@ class Keithley775A(Instrument):
 
     """
     The Keithley 775A is a 120Mhz counter/timer. You can
-    find the full specifications in the `Keithley 775A manual`_.
+    find the full specifications in the `manual`_.
 
     Example usage:
 
@@ -50,7 +55,7 @@ class Keithley775A(Instrument):
     >>> counter = ik.keithley.Keithley775A.open_gpibusb('/dev/ttyUSB0', 12)
     >>> print counter.measure(counter.Mode.frequency_A)
 
-    .. _Keithley 775A manual: https://www.tek.com/manual/keithley-model-775a-programmable-counter-timer-instruction-manual
+    .. _manual: https://www.tek.com/manual/keithley-model-775a-programmable-counter-timer-instruction-manual
     """
 
 
@@ -105,7 +110,7 @@ class Keithley775A(Instrument):
         Enum containign SRQ mask settings. Upon power-up, or after a DCL or SDC command,
         SQR is disabled.
         """
-        disabled = 0        
+        disabled = 0
         on_overflow = 1        # overflow condition occured
         on_self_test_done = 2  # self test has been completed
         on_reading_done = 8    # reading has been completed
@@ -169,10 +174,11 @@ class Keithley775A(Instrument):
     # INNER CLASSES #
     class Channel(Instrument):
         """
-        Class representing a channel A or B on the Keithley 775A counter/timer. 
+        Class representing a channel A or B on the Keithley 775A counter/timer.
         Channel C does not have any configurable settings.
         """
 
+        # pylint: disable=super-init-not-called
         def __init__(self, parent, idx):
             assert idx == 0 or idx == 1
             self._parent = parent
@@ -189,7 +195,7 @@ class Keithley775A(Instrument):
             :type: `~Keithley775A.Coupling`
             """
             return self._parent.parse_operating_mode()['coupling_{}'.format(self._ch)]
-    
+
         @coupling.setter
         def coupling(self, newval):
             if not isinstance(newval, Keithley775A.Coupling):
@@ -302,9 +308,11 @@ class Keithley775A(Instrument):
         if not isinstance(newval, Keithley775A.Mode):
             raise TypeError("Mode must be specified as a Keithley775A.Mode "
                             "value, got {} instead.".format(newval))
-        if newval in [Keithley775A.Mode.frequency_A, Keithley775A.Mode.frequency_B, Keithley775A.Mode.frequency_C]:
+        if newval in [Keithley775A.Mode.frequency_A, Keithley775A.Mode.frequency_B,
+                      Keithley775A.Mode.frequency_C]:
             self.unit = u.Hz
-        if newval in [Keithley775A.Mode.period_A, Keithley775A.Mode.period_average_A, Keithley775A.Mode.time_interval_A_to_B]:
+        if newval in [Keithley775A.Mode.period_A, Keithley775A.Mode.period_average_A,
+                      Keithley775A.Mode.time_interval_A_to_B]:
             self.unit = u.s
         if newval in [Keithley775A.Mode.pulse_A, Keithley775A.Mode.totalize_A]:
             self.unit = 1
@@ -344,8 +352,13 @@ class Keithley775A(Instrument):
         self.dc = newval
 
     def get_measuring_buffer(self):
+        """
+        Gets the measurement result as a string.
+
+        :rtype: `str`
+        """
         self._data_control = Keithley775A.DataControl.measuring_buffer # B0 mode
-        return self.query("") # as string
+        return self.query("")
 
     def get_gate_time(self):
         """
@@ -399,8 +412,8 @@ class Keithley775A(Instrument):
     @gate_time.setter
     def gate_time(self, newval):
         if isinstance(newval, str):
-            if (newval == "U"): # USER
-                self.sendcmd("GUX");
+            if newval == "U": # USER
+                self.sendcmd("GUX")
                 return
         if not isconvertible(newval, 's'):
             raise TypeError("Gate time must be convertible to seconds")
@@ -420,8 +433,8 @@ class Keithley775A(Instrument):
     @delay_time.setter
     def delay_time(self, newval):
         if isinstance(newval, str):
-            if (newval == "U"):
-                self.sendcmd("DUX");
+            if newval == "U":
+                self.sendcmd("DUX")
                 return
         if not isconvertible(newval, 's'):
             raise TypeError("Gate time must be convertible to seconds")
@@ -457,7 +470,7 @@ class Keithley775A(Instrument):
     def displayed_digits(self, newval):
         if not isinstance(newval, int):
             raise TypeError("Delay must be of int type")
-        if not(newval >= 3 and newval <=9):
+        if not(newval >= 3 and newval <= 9):
             raise RuntimeError("Display digits n=3 to 9")
         self.sendcmd('N{}X'.format(newval))
 
@@ -475,8 +488,11 @@ class Keithley775A(Instrument):
             raise RuntimeError("VisaCommunicator required")
 
     def get_status_byte(self):
+        """
+        Gets status bype on GPIB bus.
+        """
         # https://stackoverflow.com/questions/14563634/python-visa-serial-polling-function
-        sb = self._file._conn.stb
+        sb = self._file._conn.stb # pylint: disable=protected-access
         return sb
 
     def sb_rqs(self):
@@ -514,29 +530,30 @@ class Keithley775A(Instrument):
 
     def sb_overflow(self):
         """
-        Time interval overflow. 
+        Time interval overflow.
         """
         return self.get_status_byte() & 1
 
-    def trigger(self, wait_SRQ = False):
+    def trigger(self, wait_SRQ=False):
         """
         Trigger one-shot measurement in the one-shot (S0) mode
 
         :param mode: If 'cmd', sends the 'T' command. If 'GPIB', uses GPIB trigger.
-        :param wait_SRQ: If True, will wait for the completion of the measurement. on_reading_done must be enabled in SRQ mask.
+        :param wait_SRQ: If True, will wait for the completion of the measurement.
+                         on_reading_done must be enabled in SRQ mask.
         """
         if self.trigger_mode == 'cmd':
             self.sendcmd('TX')
         elif self.trigger_mode == 'GPIB':
             self.assertGPIB()
-            self._file._conn.assert_trigger()
+            self._file._conn.assert_trigger() # pylint: disable=protected-access
         else:
             raise RuntimeError("Unknown trigger mode {}".format(self.trigger_mode))
         if wait_SRQ:
             while True:
-                self._file._conn.wait_for_srq()
+                self._file._conn.wait_for_srq() # pylint: disable=protected-access
                 if self.sb_reading_done():
-                      break
+                    break
 
     @property
     def EOI(self):
@@ -645,7 +662,7 @@ class Keithley775A(Instrument):
         """
         self.sendcmd('JX')
 
-    def read(self, trigger = False):
+    def read_value(self, trigger=False):
         """
         Read a value. For one-shot measurements (S0 mode) set trigger=True.
 
@@ -658,7 +675,7 @@ class Keithley775A(Instrument):
             self.trigger()
         return self.query("")
 
-    def measure_float(self, trigger = False):
+    def measure_float(self, trigger=False):
         """
         Read a measurement.
 
@@ -666,9 +683,9 @@ class Keithley775A(Instrument):
         :type trigger: `bool`
         :rtype: `float`
         """
-        return float(self.read(trigger))
+        return float(self.read_value(trigger))
 
-    def measure_int(self, trigger = False):
+    def measure_int(self, trigger=False):
         """
         Read a measurement.
 
@@ -676,9 +693,9 @@ class Keithley775A(Instrument):
         :type trigger: `bool`
         :rtype: `int`
         """
-        return int(self.read(trigger))
+        return int(self.read_value(trigger))
 
-    def measure(self, trigger = False):
+    def measure(self, trigger=False):
         """
         Read a measurement.
 
@@ -699,7 +716,8 @@ class Keithley775A(Instrument):
         elif self.reset_mode == 'GPIB':
             self.assertGPIB()
             # https://pyvisa.readthedocs.io/en/1.5-docs/instruments.html
-            self._file._conn.clear() # selective device clear (SDC)
+            self._file._conn.clear() # pylint: disable=protected-access
+            # clear() triggers selective device clear (SDC)
         else:
             raise RuntimeError("Unknown mode {}".format(self.reset_mode))
         self.unit = u.Hz
@@ -737,26 +755,26 @@ class Keithley775A(Instrument):
         :rtype: `dict`
         """
         s = self.get_operating_mode()
-        assert(s[0:3] == '775')
-        result = { "mode": Keithley775A.Mode(int(s[3])), # F
-                 "coupling_A": Keithley775A.Coupling(int(s[4])), # AC
-                 "attenuator_A": Keithley775A.Attenuator(int(s[5])), # AA
-                 "filter_A":  s[6] == '1', # AF
-                 "slope_A": Keithley775A.Slope(int(s[7])), # AS
-                 "coupling_B": Keithley775A.Coupling(int(s[8])), # BC
-                 "attenuator_B": Keithley775A.Attenuator(int(s[9])), # BA
-                 "filter_B":  s[10] == '1', # BF
-                 "slope_B": Keithley775A.Slope(int(s[11])), # BS 
-                 "delay": s[12] == '1', # I
-                 "display_mode": Keithley775A.DisplayMode(int(s[13])), # D
-                 "data_format": Keithley775A.DataFormat(int(s[14])), # P
-                 "displayed_digits": int(s[15]), # N
-                 "EOI": s[16] == '1', # K
-                 "SRQ_mask": int(s[17:][:2]), # M
-                 "rate": Keithley775A.Rate(int(s[19])), # S
-                 "terminator": Keithley775A.Terminator(int(s[20])), # Y
-                 "totalize": Keithley775A.Totalize(int(s[21])),  # TO
-                 }
+        assert s[0:3] == '775'
+        result = {"mode": Keithley775A.Mode(int(s[3])), # F
+                  "coupling_A": Keithley775A.Coupling(int(s[4])), # AC
+                  "attenuator_A": Keithley775A.Attenuator(int(s[5])), # AA
+                  "filter_A":  s[6] == '1', # AF
+                  "slope_A": Keithley775A.Slope(int(s[7])), # AS
+                  "coupling_B": Keithley775A.Coupling(int(s[8])), # BC
+                  "attenuator_B": Keithley775A.Attenuator(int(s[9])), # BA
+                  "filter_B":  s[10] == '1', # BF
+                  "slope_B": Keithley775A.Slope(int(s[11])), # BS
+                  " delay": s[12] == '1', # I
+                  "display_mode": Keithley775A.DisplayMode(int(s[13])), # D
+                  "data_format": Keithley775A.DataFormat(int(s[14])), # P
+                  "displayed_digits": int(s[15]), # N
+                  "EOI": s[16] == '1', # K
+                  "SRQ_mask": int(s[17:][:2]), # M
+                  "rate": Keithley775A.Rate(int(s[19])), # S
+                  "terminator": Keithley775A.Terminator(int(s[20])), # Y
+                  "totalize": Keithley775A.Totalize(int(s[21])),  # TO
+                  }
         return result
 
     def parse_error_status(self):
@@ -766,13 +784,13 @@ class Keithley775A(Instrument):
         :rtype: `dict`
         """
         s = self.get_error_status()
-        assert(s[0:3] == '775')
-        assert(s[-5:] == '00000')
-        result = { "IDDC": s[3] == '1', # illegal device-dependent command
-                   "IDDCO": s[4] == '1', # illegal device-dependent option
-                   "gate_error": s[5] == '1',
-                   "self_test_error": s[6] == '1',
-                   }
+        assert s[0:3] == '775'
+        assert s[-5:] == '00000'
+        result = {"IDDC": s[3] == '1', # illegal device-dependent command
+                  "IDDCO": s[4] == '1', # illegal device-dependent option
+                  "gate_error": s[5] == '1',
+                  "self_test_error": s[6] == '1',
+                  }
         return result
 
     def __init__(self, filelike):
@@ -785,6 +803,5 @@ class Keithley775A(Instrument):
         self.reset_mode = 'GPIB'
         self.reset()
         self.trigger_mode = 'GPIB'
-        self.terminator  = Keithley775A.Terminator.no_terminator
+        self.terminator = Keithley775A.Terminator.no_terminator
         self.data_format = Keithley775A.DataFormat.without_prefix_with_leading_zero
-

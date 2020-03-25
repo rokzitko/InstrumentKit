@@ -345,25 +345,25 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
     )
 
     # pulse_train_level = unitful_property(  ## has two parameters!
-   
+
     arbitrary = string_property(
         command="ARB",
         writeonly=True,
-        bookmark_symbol = '',
+        bookmark_symbol='',
         doc="""
         Select an arbitray waveform for output.
-        
+
         :type: `str`
         """
     )
-    
+
     arbitrary_list_ch = string_property(
         command="ARBLISTCH",
         readonly=True,
-        bookmark_symbol = '',
+        bookmark_symbol='',
         doc="""
         List of all arbitrary waveforms in the channel's memory.
-        
+
         :type: `str`
         """
     )
@@ -371,10 +371,10 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
     arbitrary_list = string_property(
         command="ARBLIST",
         readonly=True,
-        bookmark_symbol = '',
+        bookmark_symbol='',
         doc="""
         List of all arbitrary waveforms in the backup memory.
-        
+
         :type: `str`
         """
     )
@@ -382,57 +382,50 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
     def arbitrary_delete(self, cpd):
         """
         Delete an arbitrary wavefrom from backup memory.
-        
+
         :type: `str`
         """
         self.sendcmd("ARBDELETE {}".format(cpd))
-    
+
     def arbitrary_clear(self, cpd):
         """
         Delete an arbitrary wavefrom from channel memory.
-        
+
         :type: `str`
         """
         self.sendcmd("ARBCLR {}".format(cpd))
-    
+
     def arbitrary_create(self, cpd, nrf):
         """
         Create a new black arbitrary waveform.
-        
+
         :type cpd: `str`
         :type nrf: `int`
         """
-        self.sendcmd("ARBCREATE {},{}".format(cpd,nrf))
-        
+        self.sendcmd("ARBCREATE {},{}".format(cpd, nrf))
+
     def arbitrary_get_data_csv(self, cpd):
         self.query("ARBDATACSV? {}".format(cpd))
-        
+
     def arbitrary_define(self, cpd, csv):
         """
         Define a new or existing arbitrary waveform from a list.
-        
+
         :type cpd: `str`
         :type csv: `iterable`
         """
         csvint = [int(x) for x in csv]
-        def check_val(x): 
+        def check_val(x):
             if not(-2048 <= x and x <= +2047):
                 raise RuntimeError("out of range {}".format(x))
-        [check_val(x) for x in csvint]
+        for x in csvint:
+            check_val(x)
         cmd = "ARBDEFCSV {},{},{}".format(cpd, str(len(csv)), ",".join([str(i) for i in csv]))
         print(cmd)
         self.sendcmd(cmd)
-        
+
     def arbitray_edit_limits(self, nrf1, nrf2):
-        self.sendcmt("ARBEDLMTS {},{}".format(nrf1,nrf2))
-        
-    def arbitrary_define2(self, cpd, csv):
-        self.arbitrary_delete(cpd)
-        self.arbitrary_create(cpd, len(csv))
-        chunk_len = 10
-        nr_chunk = ceiling_division(len(csv), chunk_len)
-        for i in range(nr_chunk):
-            self.aribitrary_edit_limits(1 + i*chunk_len, 10 + i*chunk_len)
+        self.sendcmd("ARBEDLMTS {},{}".format(nrf1, nrf2))
 
     phase = unitful_property(
         command="PHASE",
