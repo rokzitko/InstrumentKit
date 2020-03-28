@@ -8,6 +8,7 @@ Rok Zitko, March 2020
 # IMPORTS #####################################################################
 
 
+import struct
 from enum import Enum
 
 import instruments.units as u
@@ -21,10 +22,40 @@ from instruments.util_fns import enum_property, unitful_property, bool_property,
 def ceiling_division(n, d):
     return -(n // -d)
 
+def check_arb_name(cpd):
+    """
+    Checks if arbitrary waveform name is valid.
+
+    :type: `str`
+    """
+    if not(len(cpd) >= 1 and len(cpd) <= 8):
+        raise RuntimeError("Invalid name {}".format(cpd))
+
+def prepare_for_sending(cpd, csv):
+    """
+    Prepare the data for sending an arbitrary waveform to the instrument.
+
+    :type cpd: `str`
+    :type csv: `iterable`
+    """
+    check_arb_name(cpd)
+    length = len(csv)
+    if length < 4 or length > 65536:
+        raise RuntimeError("incorrect length of waveform {}".format(length))
+    csvint = [int(x) for x in csv]
+    def check_val(x):
+        if not -2048 <= x <= +2047:
+            raise RuntimeError("out of range {}".format(x))
+    for x in csvint:
+        check_val(x)
+    return length, csvint
+
 class Wavetek39A(SCPIInstrument, FunctionGenerator):
 
     """
-    The Wavetek 39A is a 40MS/s function generator.
+    The Wavetek 39A is a 40MS/s function generator. Arbitraty waveforms can have up to 65536 horizontal points,
+    vertical range is -2048 to +2047 (12 bit), maximum peak-to-peak is 20V. Up to 100 waveforms, 256 KB NVRAM.
+    Channel memory is 64 KB.
 
     Example usage:
 
@@ -220,7 +251,7 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         units=u.Hz,
         writeonly=True,
         doc="""
-        Sets the arbitrary sample clock frequency.
+        Sets the arbitrary sample clock frequency. Range 0.1Hz to 40MHz.
 
         :units: As specified, or assumed to be :math:`\\text{Hz}` otherwise.
         :type: `float` or `~quantities.quantity.Quantity`
@@ -382,30 +413,60 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
     def arbitrary_delete(self, cpd):
         """
         Delete an arbitrary wavefrom from backup memory.
+        A waveform used by a non-active sequence can be deleted but the sequence will not subsequently
+        run properly and should be modified to exclude the deleted waveform.
 
         :type: `str`
         """
+        check_arb_name(cpd)
         self.sendcmd("ARBDELETE {}".format(cpd))
 
     def arbitrary_clear(self, cpd):
         """
         Delete an arbitrary wavefrom from channel memory.
+        A waveform cannot be deleted from a channel’s memory if it is running on that channel.
+        If an arb waveform sequence is running no waveforms can be deleted from that channel,
+        whether they are used in the sequence or not.
+        Waveforms must be deleted from the channel’s memory before they can be deleted from the back-up memory.
+        (i.e. call arbitrary_clear before arbitrary_delete)
 
         :type: `str`
         """
+        check_arb_name(cpd)
         self.sendcmd("ARBCLR {}".format(cpd))
 
     def arbitrary_create(self, cpd, nrf):
         """
-        Create a new black arbitrary waveform.
+        Create a new blank arbitrary waveform.
 
         :type cpd: `str`
         :type nrf: `int`
         """
+        check_arb_name(cpd)
         self.sendcmd("ARBCREATE {},{}".format(cpd, nrf))
 
-    def arbitrary_get_data_csv(self, cpd):
-        self.query("ARBDATACSV? {}".format(cpd))
+    def _arbitrary_send_data_csv(self, cpd, csv, command):
+        length, csvint = prepare_for_sending(cpd, csv)
+        cmd = "{} {},{},{}".format(command, cpd, str(length), ",".join([str(i) for i in csvint]))
+        self.sendcmd(cmd)
+
+    def _arbitrary_send_data(self, cpd, csv, command):
+        length, csvint = prepare_for_sending(cpd, csv)
+        bin_data = struct.pack('>{}h'.format(length), *csvint)
+        size_str = str(len(bin_data))
+        len_size_str = len(size_str)
+        header = '#{}{}'.format(len_size_str, size_str)
+        cmd = "{} {},{},{}{}".format(command, cpd, str(length), header, bin_data)
+        self.sendcmd(cmd)
+
+    def arbitrary_define_csv(self, cpd, csv):
+        """
+        Define a new or existing arbitrary waveform from a list.
+
+        :type cpd: `str`
+        :type csv: `iterable`
+        """
+        self._arbitrary_send_data_csv(cpd, csv, "ARBDEFCSV")
 
     def arbitrary_define(self, cpd, csv):
         """
@@ -414,18 +475,31 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         :type cpd: `str`
         :type csv: `iterable`
         """
-        csvint = [int(x) for x in csv]
-        def check_val(x):
-            if not(-2048 <= x and x <= +2047):
-                raise RuntimeError("out of range {}".format(x))
-        for x in csvint:
-            check_val(x)
-        cmd = "ARBDEFCSV {},{},{}".format(cpd, str(len(csv)), ",".join([str(i) for i in csv]))
-        print(cmd)
-        self.sendcmd(cmd)
+        self._arbitrary_send_data(cpd, csv, "ARBDEF")
+
+    def arbitrary_get_data_csv(self, cpd):
+        """
+        Returns the arbitrary waveform data as ASCII data.
+
+        :rtype: `str`
+        """
+        check_arb_name(cpd)
+        self.query("ARBDATACSV? {}".format(cpd))
 
     def arbitray_edit_limits(self, nrf1, nrf2):
+        """
+        Define editing limits for the currently edited arbitrary waveform.
+
+        :type nrf1: `int`
+        :type nrf2: `int`
+        """
         self.sendcmd("ARBEDLMTS {},{}".format(nrf1, nrf2))
+
+    def arbitrary_data_csv(self, cpd, csv):
+        self._arbitrary_send_data_csv(cpd, csv, "ARBDATACSV")
+
+    def arbitrary_data(self, cpd, csv):
+        self._arbitrary_send_data(cpd, csv, "ARBDATA")
 
     phase = unitful_property(
         command="PHASE",
