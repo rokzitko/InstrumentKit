@@ -168,6 +168,75 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         #: tone mode
         tone = "TONE"
 
+    class SweepType(Enum):
+        """
+        Enum containing the sweep type
+        """
+        #: continuous operation
+        cont = "CONT"
+        continuous = "CONT"
+        #: triggered sweep (front TRIG IN socket, remote command, manually with MAN TRIG key)
+        #: Sweep is initiated on the rising edge of the trigger signal.
+        trig = "TRIG"
+        triggered = "TRIG"
+        #: triggered, hold and reset
+        triggered_hold_reset = "THLDRST"
+        #: manual sweeping (using rotary control or cursor keys)
+        manual = "MANUAL"
+
+    class SweepDirection(Enum):
+        """
+        Enum containing the sweep direction
+        """
+        #: up
+        up = "UP"
+        #: down
+        down = "DOWN"
+        #: up/down
+        updn = "UPDN"
+        updown = "UPDN"
+        #: down/up
+        dnup = "DNUP"
+        downup = "DNUP"
+
+    class SweepSpacing(Enum):
+        """
+        Enum containing the sweep spacing
+        """
+        #: linear
+        lin = "LIN"
+        linear = "LIN"
+        #: logarithmic
+        log = "LOG"
+        logarithmic = "LOG"
+
+    class SweepManual(Enum):
+        """
+        Enum containing the sweep manual parameters [???]
+        """
+        #: up
+        up = "UP"
+        #: down
+        down = "DOWN"
+
+    class SweepManualSpeed(Enum):
+        """
+        Enum containing the manual sweep step size.
+        """
+        #: fast
+        fast = "FAST"
+        #: slow
+        slow = "SLOW"
+
+    class SweepManualWrap(Enum):
+        """
+        Enum containing the manual sweep wrapping.
+        """
+        #: wrap on
+        wrapon = "WRAPON"
+        #: wrap off
+        wrapoff = "WRAPOFF"
+
     class SyncOutMode(Enum):
         """
         Enum containing sync output settings
@@ -205,6 +274,17 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         positive = "POS"
         negative = "NEG"
 
+    class HoldMode(Enum):
+        """
+        Enum containing the hold mode
+        """
+        #: on/off are the same as pressing the MAN HOLD key
+        on = "ON"
+        off = "OFF"
+        #: enable/disable enable or disable the action of the MAN HOLD key
+        enable = "ENAB"
+        disable = "DISAB"
+
     class Filter(Enum):
         """
         Enum containing the output filter types
@@ -219,6 +299,15 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         Bessel = "BESS"
         #: no output filtering (square wave, pulse, pulse trains)
         none = "NONE"
+
+    class BeepMode(Enum):
+        """
+        Enum containing beep modes
+        """
+        on = "ON"
+        off = "OFF"
+        warnings = "WARN"
+        errors = "ERROR"
 
     # PROPERTIES ##
 
@@ -514,6 +603,145 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         """
     )
 
+    sweep_start_frequency = unitful_property(
+        command="SWPSTARTFRQ",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the sweep start frequency. Minimum is 1 mHz.
+
+        :units: As specified, or assumed to be Hz otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`   
+        """
+    )
+
+    sweep_stop_frequency = unitful_property(
+        command="SWPSTOPFRQ",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the sweep stop frequency. Maximum is 16 MHz for all waveforms,
+        including triangle, ramp and square wave.
+
+        :units: As specified, or assumed to be Hz otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`   
+        """
+    )
+
+    sweep_centre_frequency = unitful_property(
+        command="SWPCENTFRQ",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the sweep centre frequency.
+
+        :units: As specified, or assumed to be Hz otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`   
+        """
+    )
+
+    sweep_span = unitful_property(
+        command="SWPSPAN",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the sweep frequency span.
+
+        :units: As specified, or assumed to be Hz otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`   
+        """
+    )
+
+    sweep_time = unitful_property(
+        command="SWPTIME",
+        units=u.s,
+        writeonly=True,
+        doc="""
+        Sets the sweep time. 0.03s to 999s with 3-digit resolution.
+
+        :units: As specified, or assumed to be s otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`   
+        """
+    )
+
+    sweep_type = enum_property(
+        command="SWPTYPE",
+        enum=SweepType,
+        writeonly=True,
+        doc="""
+        Sets the sweep type.
+
+        :type: `~Wavetek39A.SweepType`
+        """
+    )
+
+    sweep_direction = enum_property(
+        command="SWPDIRN",
+        enum=SweepDirection,
+        writeonly=True,
+        doc="""
+        Sets the sweep direction.
+
+        :type: `~Wavetek39A.SweepDirection`
+        """
+    )
+
+    sweep_sync = bool_property(
+        "SWPSYNC",
+        inst_true="ON",
+        inst_false="OFF",
+        writeonly=True,
+        doc="""
+        Sets the sweep syncs on and off. If on (default), the generator steps from the stop
+        frequency to zero frequency and then starts the next sweep from the first point of the
+        waveform, synchronized to the internally generated trigger signal.
+        """
+    )
+
+    sweep_spacing = enum_property(
+        command="SWPSPACING",
+        enum=SweepSpacing,
+        writeonly=True,
+        doc="""
+        Sets the sweep spacing.
+
+        :type: `~Wavetek39A.SweepSpacing`
+        """
+    )
+
+    sweep_marker = unitful_property(
+        command="SWPMARKER",
+        units=u.Hz,
+        writeonly=True,
+        doc="""
+        Sets the sweep marker (rear panel CURSOR/MARKER OUT socket).
+
+        :units: As specified, or assumed to be Hz otherwise.
+        :type: `float` or `~quantities.quantity.Quantity`
+        """
+    )
+
+    sweep_manual_speed = enum_property(
+        command="SWPMANUAL",
+        enum=SweepManualSpeed,
+        writeonly=True,
+        doc="""
+        Sets the manual step size.
+
+        :type: `~Wavetek39A.SweepManualSpeed`
+        """
+    )
+
+    sweep_manual_wrap = bool_property(
+        "SWPMANUAL",
+        inst_true="WRAPON",
+        inst_false="WRAPOFF",
+        writeonly=True,
+        doc="""
+        Sets the sweep wrapping on/off.
+        """
+    )
+
     output = bool_property(
         "OUTPUT",
         inst_true="ON",
@@ -601,6 +829,18 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         """
     )
 
+    def reset(self):
+        """
+        Resets the instrument parameters to their default values.
+        """
+        self.sendcmd("*RST")
+
+    def force_trigger(self):
+        """
+        Force a trigger
+        """
+        self.sendcmd("FORCETRG")
+
     burst_count = int_property(
         command="BSTCNT",
         writeonly=True,
@@ -609,6 +849,39 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
 
         :units: Number of cycles.
         :type: `int`
+        """
+    )
+
+    def recall(self, nrf):
+        """
+        Recall the set up in store 'nrf'. 0-9. 0 are default settings.
+        """
+        if not 0 <= nrf <= 9:
+            raise RuntimeError("out of range {}".format(nrf))
+        self.sendcmd("*RCL {}".format(nrf))
+
+    def save(self, nrf):
+        """
+        Save the set up in store 'nrf'. 1-9.
+        """
+        if not 1 <= nrf <= 9:
+            raise RuntimeError("out of range {}".format(nrf))
+        self.sendcmd("*SAV {}".format(nrf))
+
+    def manual_trigger(self):
+        """
+        Same as pressing the MAN TRIG key.
+        """
+        self.sendcmd("*TRG")
+
+    holdmode = enum_property(
+        command="HOLD",
+        enum=HoldMode,
+        writeonly=True,
+        doc="""
+        Sets the hold mode.
+
+        :type: `~Wavetek39A.HoldMode`
         """
     )
 
@@ -623,6 +896,17 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
         """
     )
 
+    beepmode = enum_property(
+        command="BEEPMODE",
+        enum=BeepMode,
+        writeonly=True,
+        doc="""
+        Sets the beep mode.
+
+        :type: `~Wavetek39A.BeepMode`
+        """
+    )
+
     def beep(self):
         """
         Beep once
@@ -631,6 +915,6 @@ class Wavetek39A(SCPIInstrument, FunctionGenerator):
 
     def local(self):
         """
-        Returns the instrument to local operation
+        Returns the instrument to local operation and unlock the keyboard.
         """
         self.sendcmd("LOCAL")
